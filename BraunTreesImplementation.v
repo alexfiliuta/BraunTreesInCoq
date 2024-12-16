@@ -9,6 +9,7 @@ Require Import Coq.Bool.Bool.
 Require Import Lia.
 Require Import Coq.Wellfounded.Inclusion.
 Require Import Coq.Wellfounded.Wellfounded.
+Require Import NAxioms NSub NDiv.
 
 Lemma eqb_reflect : forall x y, reflect (x = y) (x =? y).
 Proof.
@@ -217,7 +218,7 @@ Fixpoint diff {V: Type} (s: BraunTree V) (m: nat) : nat :=
   | Braun _ _ _, 0 => 1
   | Braun l _ r, S (S m') =>
     if even m then diff r (div2 m)
-    else diff l (div2 m)
+    else diff l (Nat.div2 m)
   | _, _ => 0
   end.
 
@@ -796,6 +797,242 @@ Admitted.
 
 (*PROOF UPDATE--------------------------------------------------------------------------------------------------------*)
 
+Lemma update_root : forall (V : Type) (v v' : V) (l r : BraunTree V),
+    update 0 v (Braun l v' r) = Braun l v r.
+Proof.
+  intros V v v' l r.
+  simpl. reflexivity.
+Qed.
+
+Lemma succ_ge_succ_gt : forall i x : nat, S i >= S x -> S i > x.
+Proof.
+  intros i x H.
+  apply le_S_n in H.
+  unfold gt.
+  lia.
+Qed.
+
+Lemma succ_ge_sizeOrg : 
+    forall (V : Type) (i : nat) (l : BraunTree V),
+      i >= sizeOrg l -> S i >= sizeOrg l.
+  Proof.
+    intros i l t H. lia.
+  Qed.
+
+Lemma succ_ge_succ : forall x y : nat, S x >= S y -> x >= y.
+Proof.
+  intros x y H.
+  unfold ge in H.
+  apply le_S_n.
+  assumption.
+Qed.
+
+Lemma succ_ge_succ2 :
+  forall x y : nat, x >= y -> S x >= S y.
+Proof.
+  intros x y H.
+  apply le_n_S in H.
+  assumption.
+Qed.
+
+Lemma nat_ge_S_impl_gt:
+  forall x y : nat,
+    x >= S y -> x > y.
+Proof.
+  intros x y H.
+  unfold gt.
+  lia.
+Qed.
+
+Lemma div2_ge : forall i x : nat, i >= 2 * x -> Nat.div2 i >= x.
+Proof.
+  intros i x H.
+  assert (Hdiv: 2 * x / 2 = x). { rewrite <- Nat.div_mul with (b := 2).  - rewrite Nat.mul_comm at 1. reflexivity. - lia. }
+  rewrite <- Hdiv.
+  apply Nat.le_trans with (m := i / 2).
+  - apply Nat.div_le_mono with (c := 2); lia.
+  - rewrite <- Nat.div2_div; apply Nat.le_refl.
+Qed.
+
+Lemma x_ge_y_plus_1_implies_x_ge_y : forall x y : nat,
+  x >= y + 1 -> x >= y.
+Proof.
+  intros x y H.
+  apply Nat.le_trans with (m := y + 1); auto with arith.
+Qed.
+
+Lemma div2_ge_even : forall i x : nat, Nat.even i = true -> S i >= 2 * x -> Nat.div2 i >= x.
+Proof.
+  intros i x Heven Hsi.
+  apply Nat.even_spec in Heven.
+  destruct Heven as [k Hk].
+  rewrite Hk in *.
+  rewrite Nat.div2_double in *.
+  simpl in Hsi.
+  assert (2 * k + 1 >= 2 * x) as Hge by lia.
+  assert (2 * k >= 2 * x - 1) as Hkx by lia.
+  apply Nat.mul_le_mono_pos_l with (p := 2) in Hkx; try lia.
+Qed.
+
+Lemma update_out_of_bounds:
+  forall (V : Type) (t : BraunTree V) (i : nat) (v : V),
+    IsBraun t ->
+    i >= sizeOrg t ->
+    update i v t = t.
+Proof.
+  intros V t.
+  induction t as [|l IHl x r IHr]; intros i val Hbraun Hi; simpl in *.
+  - reflexivity.
+  - inversion Hbraun. destruct i as [| i'].
+    + exfalso. lia.
+    + destruct (Nat.odd (S i')) eqn:Hodd.
+      * apply succ_ge_succ in Hi. rewrite Nat.odd_succ in Hodd. destruct H4.
+        ** rewrite <- H4 in Hi. rewrite add_n_n_twice in Hi.  apply div2_ge in Hi. rewrite IHl; auto.
+        ** apply succ_ge_succ2 in Hi. assert (S (sizeOrg l + sizeOrg r) = sizeOrg l + sizeOrg r + 1).
+           { rewrite <- Nat.add_1_r. reflexivity. } rewrite H5 in Hi. assert ((S i' >= sizeOrg l + sizeOrg r + 1) = (S i' >= sizeOrg l + (sizeOrg r + 1))).
+           { rewrite <- Nat.add_assoc. reflexivity. } rewrite H6 in Hi. rewrite <- H4 in Hi. rewrite add_n_n_twice in Hi.
+           rewrite IHl; auto. apply div2_ge_even; auto.
+      * simpl. Search minus. rewrite Nat.sub_0_r. apply succ_ge_succ in Hi. rewrite Nat.odd_succ in Hodd. destruct H4.
+        ** rewrite H4 in Hi. rewrite add_n_n_twice in Hi. apply div2_ge in Hi. rewrite IHr; auto.
+        ** rewrite H4 in Hi. Search add. assert (sizeOrg r + 1 + sizeOrg r = sizeOrg r + sizeOrg r + 1). { lia. } rewrite H5 in Hi. rewrite add_n_n_twice in Hi.
+            rewrite IHr; auto. apply div2_ge. apply x_ge_y_plus_1_implies_x_ge_y. assumption.
+Qed.
+
+Lemma lookup_after_update : forall (V : Type) (t : BraunTree V) (i j : nat) (v : V),
+    IsBraun t -> i < sizeOrg t ->
+    lookup (update i v t) j = (if Nat.eqb i j then Some v else lookup t j).
+Proof.
+  intros V t.  induction t as [|l IHl x r IHr]; intros i j val Hbraun Hi; simpl in *.
+  - inversion Hi.
+  - inversion Hbraun.
+    destruct i as [| i'].
+    + destruct j as [|j'].
+      * simpl. reflexivity.
+      * simpl. destruct (Nat.odd (S j')) eqn:Hodd.
+        -- reflexivity.
+        -- reflexivity.
+    + destruct (Nat.odd (S i')) eqn:Hiodd.
+      * simpl. destruct j as [| j'].
+        -- reflexivity.
+        -- admit.
+      * simpl. destruct j as [|j'].
+        -- reflexivity.
+        -- destruct (Nat.odd (S j')) eqn:Hjodd.
+            --- assert (Nat.even j' = true) as Hev. { rewrite Nat.odd_succ in Hjodd. assumption. } rewrite Hev. rewrite Nat.odd_succ in Hiodd.
+                assert (i' =? j' = false) as Hequal. { admit. } rewrite Hequal. reflexivity.
+            --- assert (Nat.even j' = false) as Hev. { rewrite Nat.odd_succ in Hjodd. assumption. } rewrite Hev. admit.
+Admitted.
+
+Fixpoint upd {V : Type} (l : list V) (i : nat) (v : V) : list V :=
+    match l, i with
+    | [], _ => []
+    | _::xs, 0 => v::xs
+    | x::xs, S j => x::(upd xs j v)
+    end.
+
+Definition my_list : list nat := [0; 1; 2; 3].
+Compute upd my_list 4 50.
+
+Definition tree : BraunTree nat :=
+    Braun (Braun (Braun Empty 3 Empty) 1 Empty) 0 (Braun Empty 2 Empty).
+Compute tree.
+Compute update 4 50 tree.
+
+Lemma update_to_list_equiv : forall (V : Type) (t : BraunTree V) (i : nat) (v : V),
+    IsBraun t -> tree_to_list (update i v t) = upd (tree_to_list t) i v.
+Proof.
+ intros V t i v. intro HBraun. induction t as [|l IHl x r IHr].
+  - simpl. reflexivity.
+  - inversion HBraun. simpl. destruct i as [| i'].
+    + simpl. reflexivity.
+    + destruct (Nat.odd (S i')) eqn:Hodd.
+      * simpl. f_equal. destruct l as [|l' v_l r'].
+        ** simpl. destruct H4. 
+          *** simpl in H4. rewrite size_list_equiv in H4.
+           assert (0 = length (tree_to_list r) -> length (tree_to_list r) = 0). { lia. }
+           apply H5 in H4. rewrite length_zero_iff_nil in H4. rewrite H4. simpl. reflexivity.
+          *** simpl in H4. rewrite size_list_equiv in H4. assert (Himp: 0 = length (tree_to_list r) + 1 -> False).
+         { intros HF. admit. }
+         exfalso. apply Himp. exact H4.
+      ** admit.
+    * simpl. f_equal. admit.
+Admitted.
+
+Lemma update_preserves_size:
+  forall (V : Type) (t : BraunTree V) (n : nat) (v : V),
+    sizeOrg (update n v t) = sizeOrg t.
+Proof.
+  induction t as [|l IHl x r IHr]; intros n val; simpl.
+  - reflexivity.
+  - destruct n as [| n']; simpl.
+    + reflexivity.
+    + destruct (Nat.odd (S n')) eqn:Hodd.
+      * simpl. f_equal. assert (sizeOrg (update (Nat.div2 n') val l)=sizeOrg l) as Hass.
+        { apply IHl with (v := val).  }
+        rewrite Hass. reflexivity.
+      * simpl. f_equal. assert (sizeOrg (update (Nat.div2 (n' - 0)) val r)=sizeOrg r) as Hass.
+        { apply IHr with (v := val). }
+        rewrite Hass. reflexivity. 
+Qed.
+
+Lemma update_idempotent:
+  forall (V : Type) (t : BraunTree V) (i : nat) (v : V),
+    IsBraun t ->
+    i < sizeOrg t ->
+    lookup t i = Some v ->
+    update i v t = t.
+Proof.
+  intros V t.
+  induction t as [| l IHl x r IHr]; intros i val Hbraun Hi Hlookup; simpl in *.
+  - (* t = Empty *)
+    (* This case cannot actually happen since i < sizeOrg t would mean i < 0. *)
+    inversion Hi.
+  - (* t = Braun l x r *)
+    inversion Hbraun as [? ? ? Hl_br Hr_br Hsz]; subst.
+    destruct i as [| i'].
+    + (* i = 0 *)
+      (* lookup (Braun l x r) 0 = Some x, so val = x.
+         update 0 val (Braun l x r) = Braun l val r = Braun l x r = t *)
+      simpl in Hlookup. inversion Hlookup. subst.
+      reflexivity.
+    + (* i = S i' > 0 *)
+      (* Check parity of (S i') *)
+      destruct (Nat.odd (S i')) eqn:Hodd.
+      * (* (S i') is odd, so i = 2k + 1 for some k, and we go into the left subtree *)
+        (* lookup (Braun l x r) (2k+1) = lookup l (Nat.div2 (2k)) = lookup l k *)
+        simpl in Hlookup.
+        (* Also, update (2k+1) val (Braun l x r) = Braun (update k val l) x r *)
+        rewrite Nat.odd_succ in Hodd; [|discriminate].
+        (* At this point:
+           lookup l k = Some val
+           and k < sizeOrg l (from properties of Braun indexing and Hi).
+           Apply IHl:
+           update k val l = l
+        *)
+        (* We need a helper lemma that the indexing scheme ensures k < sizeOrg l.
+           Assuming such a lemma is proven separately (or we can "admit" it here),
+           we get IHl applies directly. *)
+        admit.
+      * (* (S i') is even, so i = 2k + 2 for some k, and we go into the right subtree *)
+        (* lookup (Braun l x r) (2k+2) = lookup r (Nat.div2 (2k+1)) = lookup r k *)
+        (* update (2k+2) val (Braun l x r) = Braun l x (update k val r) *)
+        (* Similarly, from Hlookup we get lookup r k = Some val and k < sizeOrg r.
+           Hence, by IHr: update k val r = r *)
+        admit.
+Admitted.
+
+Lemma update_idempotence : forall (V : Type) (t : BraunTree V) (i : nat) (v : V),
+    IsBraun t -> i < sizeOrg t -> lookup t i = Some v -> update i v t = t.
+Proof.
+  intros V t i v Hbraun Hlt Hlookup.
+  induction t as [| l IHl v' r IHr].
+  - simpl in Hlt. lia.
+  - simpl in Hlt. simpl in Hlookup.
+    destruct i.
+    + simpl. inversion Hlookup. subst. reflexivity.
+    + simpl. destruct (Nat.odd i) eqn:Hodd.
+      * simpl in Hlookup. Admitted.
+
 Lemma update_maintains_braun : forall (V : Type) (t : BraunTree V) (i : nat) (v : V),
     IsBraun t -> i < sizeOrg t -> IsBraun (update i v t).
 Proof.
@@ -815,110 +1052,6 @@ Proof.
       ** simpl.
       * Admitted.
 
-Lemma update_root : forall (V : Type) (v v' : V) (l r : BraunTree V),
-    update 0 v (Braun l v' r) = Braun l v r.
-Proof.
-  intros V v v' l r.
-  simpl. reflexivity.
-Qed.
-
-Lemma succ_ge_succ_gt : forall i x : nat, S i >= S x -> S i > x.
-Proof.
-  intros i x H.
-  apply le_S_n in H.
-  unfold gt.
-  lia.
-Qed.
-
-Lemma add_le_cancel_right : forall x y z : nat, x + y <= z -> x <= z.
-Proof.
-  intros x y z H.
-  apply le_trans with (x + y); auto with arith.
-Qed.
-
-Lemma succ_ge_sizeOrg : 
-    forall (V : Type) (i : nat) (l : BraunTree V),
-      i >= sizeOrg l -> S i >= sizeOrg l.
-  Proof.
-    intros i l t H. lia.
-  Qed.
-
-Lemma update_out_of_bounds : forall (V : Type) (t : BraunTree V) (i : nat) (v : V),
-    IsBraun t -> i >= sizeOrg t -> update i v t = t.
-Proof.
-  intros V t i v Hbraun Hge.
-  induction t as [| l IHl v' r IHr].
-  - simpl. reflexivity.
-  - simpl in Hge.
-    destruct i.
-    + lia.
-    + simpl. destruct (Nat.odd (S i)) eqn:Hodd.
-      * assert (Nat.div2 i = S i) as HsizeI. { admit. } rewrite HsizeI. inversion Hbraun. apply IHl in H2. rewrite H2. reflexivity. 
-        apply le_S_n in Hge. apply add_le_cancel_right in Hge. apply succ_ge_sizeOrg in Hge. assumption.
-      * assert (Nat.div2 i = S i) as HsizeI. {admit. } rewrite <- minus_n_O. rewrite HsizeI. inversion Hbraun. apply IHr in H3. rewrite H3. reflexivity.
-        apply le_S_n in Hge. assert (sizeOrg l + sizeOrg r <= i -> sizeOrg r <= i) as HHyp. { lia. } apply HHyp in Hge. apply succ_ge_sizeOrg in Hge. 
-        assumption.
-Admitted.
-
-Lemma lookup_after_update : forall (V : Type) (t : BraunTree V) (i j : nat) (v : V),
-    IsBraun t -> i < sizeOrg t ->
-    lookup (update i v t) j = if i =? j then Some v else lookup t j.
-Proof.
-  intros V t i j v Hbraun Hlt.
-  generalize dependent j.
-  induction t as [| l IHl v' r IHr].
-  - simpl in Hlt. lia.
-  - intros j.
-    simpl in Hlt.
-    simpl. destruct i.
-    + simpl. destruct j.
-      * simpl. reflexivity.
-      * simpl. reflexivity.
-    + simpl. destruct (Nat.odd i) eqn:Hodd.
-      * destruct j.
-        -- simpl. Admitted.
-
-Fixpoint upd {V : Type} (l : list V) (i : nat) (v : V) : list V :=
-    match l, i with
-    | [], _ => []
-    | _::xs, 0 => v::xs
-    | x::xs, S j => x::(upd xs j v)
-    end.
-
-Lemma update_to_list_equiv : forall (V : Type) (t : BraunTree V) (i : nat) (v : V),
-    IsBraun t -> i < sizeOrg t ->
-    tree_to_list (update i v t) = upd (tree_to_list t) i v.
-Proof. Admitted.
-
-Lemma size_update_const : forall (V : Type) (t : BraunTree V) (i : nat) (v : V),
-    IsBraun t ->  sizeOrg (update i v t) = sizeOrg t.
-Proof.
-  intros V t i v Hbraun. revert i Hbraun.
-  induction t as [| l IHl v' r IHr].
-  - simpl. lia.
-  - intros i Hbraun. destruct i as [| i'].
-    + simpl. reflexivity.
-    + simpl. destruct (Nat.odd (S i')) eqn:Hodd; simpl.
-      * f_equal. admit.
-      * simpl. f_equal. rewrite <- minus_n_O. assert (sizeOrg (update (Nat.div2 i') v r) = sizeOrg r). admit.
-
-        rewrite H. reflexivity.
-Admitted.
-
-Lemma update_idempotence : forall (V : Type) (t : BraunTree V) (i : nat) (v : V),
-    IsBraun t -> i < sizeOrg t -> lookup t i = Some v -> update i v t = t.
-Proof.
-  intros V t i v Hbraun Hlt Hlookup.
-  induction t as [| l IHl v' r IHr].
-  - simpl in Hlt. lia.
-  - simpl in Hlt. simpl in Hlookup.
-    destruct i.
-    + simpl. inversion Hlookup. subst. reflexivity.
-    + simpl. destruct (Nat.odd i) eqn:Hodd.
-      * simpl in Hlookup. Admitted.
-
- Search nth_error.
-
 
 (*PROOF REPLICATE--------------------------------------------------------------------------------------------------------*)
 Lemma replicate_size : forall {V : Type} (x : V) (n : nat),
@@ -929,16 +1062,6 @@ Proof.
   - simpl. rewrite size_insert_inc. rewrite IHn'. lia.
 Qed.
 
-Lemma replicate_same_element : forall {V : Type} (x : V) (n : nat),
-  forall idx, idx < n -> lookup (replicate x n) idx = Some x.
-Proof.
-  intros. revert H. induction n as [|n'].
-  - intro H. inversion H.
-  - intro H. simpl. destruct idx as [|idx'].
-    + admit.
-    + assert (Hidx: idx' < n') by lia. admit.
-Admitted. 
-
 Lemma replicate_is_braun : forall {V : Type} (x : V) (n : nat) ,
   IsBraun (replicate x n).
 Proof.
@@ -946,6 +1069,24 @@ Proof.
   - simpl. constructor.
   - simpl. apply insert_maintains_braun. assumption.
 Qed.
+
+Lemma lookup_replicate : forall {V : Type} (x : V) (n i : nat),
+  i < n ->
+  lookup (replicate x n) i = Some x.
+Proof.
+  intros V x n.
+  induction n as [| n' IH].
+  - intros i Hi. lia.
+  - intros i Hi. simpl replicate. destruct (Nat.eq_dec i n') as [Heq | Hneq].
+    + subst i. assert (sizeOrg (replicate x n') = n'). { rewrite replicate_size. reflexivity. }
+      assert (Hbraun: IsBraun (replicate x n')). { apply replicate_is_braun. }
+      assert (Hsize: sizeOrg (replicate x n') = n') by apply replicate_size.
+      rewrite <- Hsize at 2. apply insert_last_lookup; auto.
+    + assert (Hi' : i < n') by lia. apply IH in Hi'. assert (Hbraun: IsBraun (replicate x n')) by apply replicate_is_braun. 
+      rewrite lookup_after_insert by auto. destruct (i =? sizeOrg (replicate x n')).
+      * reflexivity.
+      * rewrite IH. reflexivity. lia. 
+Qed. 
 
 (*PROOF TREE-TO-LIST--------------------------------------------------------------------------------------------------------*)
 (*
@@ -965,6 +1106,21 @@ Qed.
 
 
 (*OKASAKI PROOF--------------------------------------------------------------------------------------------------------*)
+
+Lemma diff_size_tree : forall (V : Type) (t : BraunTree V),
+  IsBraun t -> diff t (sizeOrg t) = 0.
+Proof.
+  intros. induction t as [| l Hl v r Hr].
+  - simpl. reflexivity.
+  - simpl. destruct (sizeOrg l + sizeOrg r) eqn:Hsz.
+    + reflexivity.
+    + inversion H; subst. destruct H5.
+      * rewrite H0 in Hsz. apply Hl in H3. apply Hr in H4. rewrite add_n_n_twice in Hsz. destruct (even n) eqn:Hevv.
+        ** admit. (*I need to prove that S n/2 = (S n) / 2 but n is even so it is not correct*)
+        ** assert (S n = Nat.div2 (2 * (S n))). { rewrite Nat.div2_double. reflexivity. } rewrite H1 in Hsz. admit.
+      * admit.
+Admitted.
+
 
 Lemma okasaki_alg_1_proof : forall (V: Type) (t : BraunTree V),
   IsBraun t -> sizeOrg t = size t.
