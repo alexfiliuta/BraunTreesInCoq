@@ -822,39 +822,83 @@ Qed.
 
 Search nth_error. Compute nth_error.
 
-Lemma merge_lists_even_index : forall (V : Type) (l1 l2 : list V) (n : nat), 
-  length l1 = length l2 \/ length l1 = length l2 + 1 ->
-  Nat.even n = true ->
-  nth_error (merge_lists l1 l2) n = nth_error l1 (Nat.div2 n).
-Proof.
-  intros V l1 l2 n Hlen Heven.
-  generalize dependent n.
-  generalize dependent l2.
-  induction l1 as [|x1 l1' IH]; intros l2 n Hlen Heven.
-  - destruct l2; simpl in *.
-    + rewrite nth_error_nil. rewrite nth_error_nil. reflexivity.
-    + destruct n; simpl in H; discriminate H.
-  - destruct l2 as [|x2 l2']; simpl in *.
-    + destruct n. simpl.
-      * discriminate H.
-      * admit.
-    + admit.
-Admitted.
+Lemma nth_S :
+  forall (V : Type) (xs : list V) (i : nat) (x : V),
+    nth_error (x :: xs) (S i) = nth_error xs i.
+Proof. reflexivity. Qed.
 
-Lemma merge_lists_odd_index : forall (V : Type) (l1 l2 : list V) (n : nat),
-  length l1 = length l2 \/ length l1 = length l2 + 1 ->
-  Nat.odd n = true ->
-  nth_error (merge_lists l1 l2) n = nth_error l2 (Nat.div2 n).
+Lemma nth_empty :
+  forall (V : Type) (i : nat),
+    nth_error (@nil V) i = None.
 Proof.
-  intros V l1 l2 n Hlen Hodd.
-  generalize dependent n.
-  generalize dependent l2.
-  induction l1 as [|x1 l1' IH]; intros l2 n Hlen Hodd.
-  - destruct l2. simpl in *. rewrite nth_error_nil. rewrite nth_error_nil. reflexivity.
-    destruct n; simpl in H; discriminate H.
-  - admit.
-Admitted.
+  intros. destruct i.
+  - simpl. reflexivity.
+  - simpl. reflexivity.
+Qed.
 
+Lemma nth_error_merge_lists_even :
+  forall (V : Type) (l1 l2 : list V) (k : nat),
+    (length l1 = length l2 \/ length l1 = length l2 + 1) ->
+    nth_error (merge_lists l1 l2) (2*k) = nth_error l1 k.
+Proof.
+  intros V l1 l2 k Hlen.
+  generalize dependent k.
+  generalize dependent l2.
+  induction l1 as [|x xs IHl1]; intros l2 k.
+  - destruct k.
+    -- simpl in H; symmetry in H;  rewrite length_zero_iff_nil in H. rewrite H; simpl. intro k. rewrite nth_empty.
+       rewrite nth_empty. reflexivity.
+    -- simpl in H. rewrite Nat.add_1_r in H. discriminate H.
+  - destruct l2 as [|y ys].
+    + destruct k as [Hlen|Hlen]; simpl in Hlen.
+      * inversion Hlen.
+      * simpl. destruct k.
+        -- simpl. reflexivity.
+        -- simpl. assert (S (length xs) = 1 -> length xs = 0) by lia. apply H in Hlen; clear H. rewrite length_zero_iff_nil in
+           Hlen. rewrite Hlen. rewrite nth_empty. rewrite nth_empty. reflexivity.
+    + intro k0. destruct k; simpl.
+      * destruct k0. 
+        ** simpl. reflexivity. 
+        ** rewrite nth_S. assert (S k0 + (S k0 + 0) = S (S (2 * k0))) by lia. rewrite H0. rewrite nth_S. rewrite nth_S. 
+           apply IHl1. left. simpl in H. lia.
+      * destruct k0. 
+        ** simpl. reflexivity.
+        ** rewrite nth_S. assert ((S k0 + (S k0 + 0)) = S (S (2 * k0))) by lia. rewrite H0.
+        rewrite nth_S. rewrite nth_S. apply IHl1. right. simpl in H. lia.
+Qed.
+
+Lemma nth_error_merge_lists_odd :
+  forall (V : Type) (l1 l2 : list V) (k : nat),
+    (length l1 = length l2 \/ length l1 = length l2 + 1) ->
+    nth_error (merge_lists l1 l2) ( 2*k + 1) = nth_error l2 k.
+Proof.
+  intros V l1 l2 k Hlen.
+  generalize dependent k.
+  generalize dependent l1.
+  induction l2 as [|x xs IHl2]; intros l1 k.
+  - intro k0. destruct k.
+    -- simpl in H;  rewrite length_zero_iff_nil in H. rewrite H; simpl. rewrite nth_empty.
+       rewrite nth_empty. reflexivity.
+    -- simpl in H. rewrite nth_empty. destruct l1.
+      --- simpl in H. discriminate H.
+      --- simpl in H. assert (length l1 = 0) by lia. rewrite length_zero_iff_nil in H0. rewrite H0. simpl.
+          rewrite Nat.add_1_r. simpl. rewrite nth_empty. reflexivity.
+  - destruct l1 as [|y ys].
+    + destruct k as [Hlen|Hlen]; simpl in Hlen.
+      * inversion Hlen.
+      * simpl. destruct k.
+        -- discriminate Hlen.
+        -- discriminate Hlen.
+    + intro k0. destruct k; simpl.
+      * destruct k0. 
+        ** simpl. reflexivity. 
+        ** rewrite nth_S. assert (S k0 + (S k0 + 0) = S (S (2 * k0))) by lia. rewrite H0. rewrite Nat.add_1_r. 
+           rewrite nth_S. rewrite nth_S. rewrite <- Nat.add_1_r. apply IHl2. left. simpl in H. lia.
+      * destruct k0. 
+        ** simpl. reflexivity.
+        ** rewrite nth_S. assert (S k0 + (S k0 + 0) = S (S (2 * k0))) by lia. rewrite H0. rewrite Nat.add_1_r. 
+           rewrite nth_S. rewrite nth_S. rewrite <- Nat.add_1_r. apply IHl2. right. simpl in H. lia.
+Qed.
 
 Lemma lookup_to_list_equiv : forall (V : Type) (t : BraunTree V) (i : nat),
     IsBraun t -> lookup t i = nth_error (tree_to_list t) i.
@@ -868,20 +912,20 @@ Proof.
     -- inversion Hbraun. destruct (Nat.even i) eqn:Heven.
       --- simpl. rewrite IHl.
           * destruct H4.
-            ** rewrite merge_lists_even_index.
-              *** reflexivity.
+            ** rewrite Nat.even_spec in Heven. inversion Heven as [k Hk]. rewrite Hk. rewrite nth_error_merge_lists_even.
+              *** rewrite Nat.div2_double. reflexivity.
               *** left. rewrite size_list_equiv in H4. rewrite size_list_equiv in H4. assumption.
-              *** assumption.
-            **  rewrite merge_lists_even_index.
-              *** reflexivity.
+            **  rewrite Nat.even_spec in Heven. inversion Heven as [k Hk]. rewrite Hk. rewrite nth_error_merge_lists_even.
+              *** rewrite Nat.div2_double. reflexivity.
               *** right. rewrite size_list_equiv in H4. rewrite size_list_equiv in H4. assumption.
-              *** assumption.
           * assumption.
       --- simpl. rewrite IHr. 
-          * rewrite merge_lists_odd_index.
-            ** reflexivity.
+          * rewrite <- Nat.negb_odd in Heven. rewrite negb_false_iff in Heven. rewrite Nat.odd_spec in Heven.
+            inversion Heven as [k Hk]. rewrite Hk. rewrite nth_error_merge_lists_odd.
+            ** simpl. rewrite Nat.add_0_r. rewrite add_n_n_twice. rewrite Nat.add_1_r. Search div2. rewrite <- Nat.Even_div2.
+               rewrite Nat.div2_double. reflexivity. rewrite <- Nat.even_spec. rewrite <- add_n_n_twice. rewrite n_plus_n_even.
+               reflexivity.
             ** rewrite size_list_equiv in H4. rewrite size_list_equiv in H4. assumption.
-            ** Search Nat.even. rewrite  <- Nat.negb_even.  Search negb. rewrite negb_true_iff. assumption.
           * assumption.
 Qed.
 
@@ -1225,7 +1269,75 @@ Definition tree : BraunTree nat :=
 Compute tree.
 Compute update 4 50 tree.
 
-(*
+Lemma upd_S :
+  forall (A : Type) (y : A) (xs : list A) (i : nat) (x : A),
+    upd (y :: xs) (S i) x = y :: upd xs i x.
+Proof. reflexivity. Qed.
+
+Lemma upd_even_index : forall (V : Type) (l1 l2 : list V) (k : nat) (v : V), 
+  length l1 = length l2 \/ length l1 = length l2 + 1 ->
+  upd (merge_lists l1 l2) (2 * k) v = merge_lists (upd l1 k v) l2.
+Proof.
+  intros V l1 l2 k v Hlen.
+  generalize dependent k.
+  generalize dependent l2.
+  induction l1 as [|x xs IHl1]; intros l2 k.
+  - destruct k.
+    -- simpl in H; symmetry in H;  rewrite length_zero_iff_nil in H. rewrite H; simpl. intro k. reflexivity.
+    -- simpl in H. rewrite Nat.add_1_r in H. discriminate H.
+  - destruct l2 as [|y ys].
+    + destruct k as [Hlen|Hlen]; simpl in Hlen.
+      * inversion Hlen.
+      * simpl. destruct k.
+        -- simpl. reflexivity.
+        -- simpl. assert (S (length xs) = 1 -> length xs = 0) by lia. apply H in Hlen; clear H. rewrite length_zero_iff_nil in
+           Hlen. rewrite Hlen. simpl. reflexivity.
+    + intro k0. destruct k; simpl.
+      * destruct k0. 
+        ** simpl. reflexivity. 
+        ** assert (S k0 + (S k0 + 0) = S (S (2 * k0))) by lia. rewrite H0. rewrite IHl1.
+          *** rewrite merge_lists_twist_L. f_equal. rewrite merge_lists_twist_L. f_equal.
+          *** left. simpl in H. lia.
+      * destruct k0. 
+        ** simpl. reflexivity.
+        ** assert ((S k0 + (S k0 + 0)) = S (S (2 * k0))) by lia. simpl. assert (k0 + S (k0 + 0) = S(2 * k0)) by lia.
+           rewrite  H1. rewrite IHl1.
+          *** reflexivity.
+          *** right. simpl in H. lia.
+Qed.
+
+
+Lemma upd_odd_index : forall (V : Type) (l1 l2 : list V) (k : nat) (v : V), 
+  length l1 = length l2 \/ length l1 = length l2 + 1 ->
+  upd (merge_lists l1 l2) (2 * k + 1) v = merge_lists l1 (upd l2 k v).
+Proof.
+  intros V l1 l2 k v Hlen.
+  generalize dependent k.
+  generalize dependent l1.
+  induction l2 as [|x xs IHl2]; intros l1 k.
+  - intro k0. destruct k.
+    -- simpl in H;  rewrite length_zero_iff_nil in H. rewrite H; simpl. reflexivity.
+    -- simpl in H. simpl. destruct l1.
+      --- simpl in H. discriminate H.
+      --- simpl in H. assert (length l1 = 0) by lia. rewrite length_zero_iff_nil in H0. rewrite H0. simpl.
+          rewrite Nat.add_1_r. reflexivity.
+  - destruct l1 as [|y ys].
+    + destruct k as [Hlen|Hlen]; simpl in Hlen.
+      * inversion Hlen.
+      * simpl. destruct k.
+        -- discriminate Hlen.
+        -- discriminate Hlen.
+    + intro k0. destruct k; simpl.
+      * destruct k0. 
+        ** simpl. reflexivity. 
+        ** assert (S k0 + (S k0 + 0) = S (S (2 * k0))) by lia. rewrite H0. rewrite Nat.add_1_r. 
+           f_equal; f_equal. rewrite <- Nat.add_1_r. apply IHl2. left. simpl in H. lia.
+      * destruct k0. 
+        ** simpl. reflexivity.
+        ** assert (S k0 + (S k0 + 0) = S (S (2 * k0))) by lia. rewrite H0. rewrite Nat.add_1_r. 
+           f_equal; f_equal. rewrite <- Nat.add_1_r. apply IHl2. right. simpl in H. lia.
+Qed.
+
 Lemma update_to_list_equiv : forall (V : Type) (t : BraunTree V) (i : nat) (v : V),
     IsBraun t -> tree_to_list (update i v t) = upd (tree_to_list t) i v.
 Proof.
@@ -1234,37 +1346,20 @@ Proof.
   - intros i. inversion HBraun. simpl. destruct i eqn:Hi.
     + simpl. reflexivity.
     + destruct (Nat.odd (S n)) eqn:Hodd.
-      * simpl. f_equal. rewrite IHl with (i := Nat.div2 n).
-        ** destruct (tree_to_list l) eqn:Htl.
-          *** simpl. destruct (tree_to_list r) eqn:Htr.
-            **** simpl. reflexivity.
-            **** simpl. destruct n. ++ admit. ++ admit.
-          *** simpl. destruct (Nat.div2).
-            **** simpl. destruct (tree_to_list r).
-              ++ simpl. admit.
-              ++ simpl. destruct n.
-                +++ reflexivity.
-                +++ f_equal. admit. admit.
-            **** destruct (tree_to_list r).
-              ++ simpl.  admit. 
-              ++ admit.
-        ** inversion HBraun; assumption.
+      * simpl. f_equal. rewrite Nat.odd_succ in Hodd. apply Nat.even_spec in Hodd. destruct Hodd as [n0 Hn0]; subst.
+        rewrite upd_even_index. 
+        ** rewrite IHl.
+          *** simpl. rewrite Nat.add_0_r. rewrite div2_double. reflexivity.
+          *** inversion HBraun; assumption.
+        ** repeat rewrite <- size_list_equiv. assumption. 
       * simpl. f_equal. rewrite Nat.sub_0_r. rewrite IHr with ( i := Nat.div2 n).
-        ** admit.
+        ** rewrite <- Nat.negb_even in Hodd. rewrite negb_false_iff in Hodd. rewrite Nat.even_succ in Hodd.
+           rewrite Nat.odd_spec in Hodd. destruct Hodd as [n0 Hn0]; subst. rewrite upd_odd_index.
+          *** rewrite Nat.add_1_r. Search Nat.div2. rewrite Nat.div2_succ_double. reflexivity.
+          *** repeat rewrite <- size_list_equiv. assumption.
         ** inversion HBraun; assumption.
-Admitted.
+Qed.
 
-        ** simpl. destruct H4. 
-          *** simpl in H4. rewrite size_list_equiv in H4.
-           assert (0 = length (tree_to_list r) -> length (tree_to_list r) = 0). { lia. }
-           apply H5 in H4. rewrite length_zero_iff_nil in H4. rewrite H4. simpl. reflexivity.
-          *** simpl in H4. rewrite size_list_equiv in H4. assert (Himp: 0 = length (tree_to_list r) + 1 -> False).
-         { intros HF. admit. }
-         exfalso. apply Himp. exact H4.
-      ** admit.
-    * simpl. f_equal. admit.
-Admitted.
-*)
 Lemma update_preserves_size:
   forall (V : Type) (t : BraunTree V) (n : nat) (v : V),
     sizeOrg (update n v t) = sizeOrg t.
