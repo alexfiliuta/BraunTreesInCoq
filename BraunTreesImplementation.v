@@ -569,105 +569,43 @@ destruct l1.
     * inversion H. rewrite <- H1. reflexivity.
     * discriminate H.
 Qed.
-(*
-Lemma removeRoot_value_newL : forall (V : Type) (l1 r1 : BraunTree V) (v1 lv : V) (newL : BraunTree V),
-  removeRoot (Braun l1 v1 r1) = Some (lv, newL) -> merge_lists (tree_to_list l1) (tree_to_list r1) = tree_to_list newL.
-Proof.
-  intros V l1 r1 v1 lv.
-  induction l1 as [ | l1_left HypL l1_val l1_right HypR ]; intros newL H.
-  - destruct r1 as [ | rl rv rr ].
-    + inversion H; subst. simpl. reflexivity.
-    + inversion H.
-  - destruct r1 as [| r1 rv rr]. 
-    + simpl. rewrite <- HypL.
-      * simpl. admit.
-      * clear. induction l1_left; simpl; auto. admit.
-    + destruct (removeRoot (Braun (Braun l1_left l1_val l1_right) v1 (Braun r1 rv rr))) as [[lv_sub newL_sub]|] eqn:HeqRemove.
-      *
-      * simpl. destruct (removeRoot (Braun l1_left l1_val l1_right)) as [[lv_sub newL_sub]|] eqn:HeqRemove.
-        ** rewrite HypL in HeqRemove.
-        ** simpl in HeqRemove.
-    + inversion H; subst; clear H.
-      simpl. destruct (tree_to_list r1) as [| y ys] eqn:E_r1.
-      * simpl. apply removeRoot_value_eq in HeqRemove. rewrite HeqRemove. destruct l1_left.
-        ** simpl. inversion H1. destruct l1_right.
-          *** simpl. inversion H0. simpl. rewrite E_r1. simpl. rewrite HeqRemove. reflexivity.
-          *** simpl. inversion H0.
-        ** simpl. destruct (tree_to_list l1_right).
-          *** destruct (removeRoot (Braun l1_left1 v l1_left2)).
-            **** destruct H1 eqn:HP. simpl. admit.
-            **** inversion H1.
-          *** destruct (removeRoot (Braun l1_left1 v l1_left2)).
-            **** admit.
-            **** inversion H1.
-      * destruct  l1_left. admit. admit.
-    + inversion HeqRemove. admit.
-Admitted.
 
-Lemma removeRoot_value_newL : forall (V : Type) (l1 r1 : BraunTree V) (v1 lv : V) (newL : BraunTree V),
-  removeRoot (Braun l1 v1 r1) = Some (lv, newL) -> merge_lists (tree_to_list l1) (tree_to_list r1) = tree_to_list newL.
-Proof.
-  intros V l1 r1 v1 lv newL H.
-  simpl in H.
-  destruct l1 as [ | l1_left l1_val l1_right ].
-  - destruct r1 as [ | rl rv rr ].
-    + inversion H; subst. simpl. reflexivity.
-    + inversion H.
-  - simpl in H.
-    destruct (removeRoot (Braun l1_left l1_val l1_right)) as [[lv_sub newL_sub]|] eqn:HeqRemove.
-    + inversion H; subst; clear H.
-      simpl. destruct (tree_to_list r1) as [| y ys] eqn:E_r1.
-      * simpl. f_equal.
-        -- apply removeRoot_value_eq in HeqRemove. admit.
-      
-      * simpl. f_equal. f_equal.
-        -- apply removeRoot_value_eq in  HeqRemove. admit.
-    + inversion HeqRemove. rewrite H1.
-Admitted.
-*)
 Lemma merge_lists_twist_L {V : Type} (x : V) (xs ys : list V) :
-  merge_lists (x :: xs) ys = x :: merge_lists ys xs
-with merge_lists_twist_R {V : Type} (y : V) (ys xs : list V) :
-  merge_lists (y :: ys) xs = y :: merge_lists xs ys.
+  merge_lists (x :: xs) ys = x :: merge_lists ys xs.
 Proof.
-- destruct ys as [| y' ys']; simpl.
-  + reflexivity.
-  + f_equal. destruct xs as [| x'xs']; simpl.
-    -- simpl. reflexivity.
-    -- f_equal. apply merge_lists_twist_R.
-- destruct xs as [| x' xs']; simpl.
-  + reflexivity.
-  + f_equal. destruct ys as [| y'ys']; simpl.
-    -- reflexivity.
-    -- f_equal. apply merge_lists_twist_L.
-Qed. 
+revert x xs. induction ys as [| y' ys']; intros x xs; simpl.
+- reflexivity.
+- f_equal. destruct xs as [| x'xs']; simpl.
+  + simpl. reflexivity.
+  + f_equal. rewrite <- IHys'.
+    reflexivity.
+Qed.
 
 Lemma remove_to_list_equiv {V : Type} (t : BraunTree V) (v : V) :
     IsBraun t ->
     forall t', removeRoot t = Some (v, t') ->
                tree_to_list t = v :: tree_to_list t'.
 Proof.
-  intros Hbraun t' Hremove.
-  induction t as [| l IHl v' r IHr].
+  intros Hbraun. revert v.
+  induction t as [| l IHl v' r IHr]; intros v t' Hremove.
   - simpl in Hremove. discriminate Hremove.
-  - simpl in Hremove. destruct l as [| l1 vl r1].
-    + destruct r as [| l2 vr r2].
+  - simpl in Hremove.
+    destruct l as [| l1 vl r1].
+    + simpl. destruct r as [| l2 vr r2].
       * inversion Hremove. simpl. reflexivity.
       * inversion Hremove.
-    + destruct (removeRoot (Braun l1 vl r1)) as [[lv newL]|] eqn:HremL.
-      * inversion Hremove. subst. clear Hremove. simpl. inversion Hbraun; subst. rename H2 into Hl.
-        rename H3 into Hr. rename H4 into HsizeCond.
-        assert (H_Head := HremL). apply removeRoot_value_eq in H_Head.
-        assert (H_Tail: merge_lists (tree_to_list l1) (tree_to_list r1) = tree_to_list newL).
-        {
-          admit.
-        }
-        subst vl. destruct (tree_to_list r) as [| y ys] eqn:HrList.
-        *** simpl. rewrite H_Tail. reflexivity.
-        *** simpl. rewrite H_Tail. rewrite <- merge_lists_twist_L.
-          f_equal.
+    + transitivity (v' :: merge_lists (tree_to_list (Braun l1 vl r1)) (tree_to_list r)).
+      { reflexivity. }
+      destruct (removeRoot (Braun l1 vl r1)) as [[lv newL]|] eqn:HremL.
+      * inversion Hremove. subst. clear Hremove.
+        f_equiv. assert (IsBraun (Braun  l1 vl r1)) as HbraunL.
+        { inversion Hbraun; auto. }
+        specialize (IHl HbraunL lv newL).
+        rewrite IHl; [ |auto].
+        rewrite merge_lists_twist_L.
+        reflexivity.
       * inversion Hremove.
-Admitted.
+Qed.
 
 Lemma removeRoot_maintains_braun : forall (V : Type) (t : BraunTree V) v t',
     IsBraun t -> removeRoot t = Some (v, t') -> IsBraun t'.
@@ -1023,6 +961,44 @@ Proof.
   - apply Nat.eqb_eq in Heq. rewrite Heq. rewrite lookup_after_insert_Some. reflexivity. assumption.
   - rewrite lookup_after_insert_lookup. reflexivity. assumption. apply Nat.eqb_neq in Heq.  assumption.
 Qed.
+
+Lemma lookup_after_remove: forall (V : Type) (t : BraunTree V) (i : nat) (newT : BraunTree V),
+    IsBraun t ->
+    remove t = Some newT ->
+    lookup newT i = lookup t (S i).
+Proof.
+  intros V t i newT Hbraun Hremove.
+  unfold remove in Hremove.
+  destruct (removeRoot t) as [[v t'] |] eqn:Hroot; inversion Hremove; subst.
+  clear Hremove.
+  revert i.
+  induction t as [| l IHl v' r IHr].
+  - simpl in Hroot. discriminate Hroot.
+  - simpl in Hroot.
+    destruct l as [| l1 vl r1].
+    + destruct r as [| l2 vr r2].
+      * inversion Hroot; subst; simpl.
+        -- intro i. destruct (Nat.even i); reflexivity.
+      * inversion Hroot.
+    + destruct (removeRoot (Braun l1 vl r1)) as [[lv newL]|] eqn:HremL.
+      * inversion Hroot; subst; simpl.
+        -- destruct i; simpl.
+           ++ apply removeRoot_value_eq in HremL. rewrite HremL.  reflexivity.
+           ++ destruct (Nat.even i) eqn:Heven.
+              ** destruct i.
+                *** simpl. reflexivity. 
+                *** rewrite Nat.even_succ in Heven. assert (Hodd : Nat.Odd i). 
+                    { rewrite Nat.odd_spec in Heven. assumption. } Compute Nat.succ. 
+                    unfold Nat.odd in Heven. apply negb_true_iff in Heven. rewrite Heven. Search Nat.div2. 
+                    Compute Nat.Odd_div2. rewrite Nat.Odd_div2. reflexivity. assumption.
+              ** destruct i.
+                *** rewrite Nat.even_0 in Heven. discriminate Heven.
+                *** rewrite Nat.even_succ in Heven. unfold Nat.odd in Heven. rewrite <- negb_true_iff in Heven.
+                    Search negb. rewrite negb_involutive in Heven. rewrite Heven. destruct (Nat.even (Nat.div2 i)).
+                admit. admit.
+      * inversion Hroot.
+Admitted.
+
 
 (*PROOF UPDATE--------------------------------------------------------------------------------------------------------*)
 
@@ -1501,16 +1477,47 @@ Qed.
 Lemma diff_size_tree : forall (V : Type) (t : BraunTree V),
   IsBraun t -> diff t (sizeOrg t) = 0.
 Proof.
-  intros. revert H. induction t as [| l Hl v r Hr].
-  - simpl. reflexivity.
-  - revert Hl Hr. simpl. destruct (sizeOrg l + sizeOrg r) eqn:Hsz.
-    + reflexivity.
-    + inversion H; subst. destruct H5.
-      * rewrite H0 in Hsz. apply Hl in H3. apply Hr in H4. rewrite add_n_n_twice in Hsz. destruct (even n) eqn:Hevv.
-        ** admit. (*I need to prove that S n/2 = (S n) / 2 but n is even so it is not correct*)
-        ** assert (S n = Nat.div2 (2 * (S n))). { rewrite Nat.div2_double. reflexivity. } rewrite H1 in Hsz. admit.
-      * admit.
+  intros. revert t H. induction t as [| l IHl x r IHr].
+  - intros. simpl. reflexivity.
+  - intro. simpl. inversion H. destruct l as [|ll ls].
+    -- destruct H5.
+      --- simpl in H5. rewrite <- H5. reflexivity.
+      --- simpl in H5. rewrite Nat.add_1_r in H5. discriminate H5.
+    -- admit.
 Admitted.
+(*
+Lemma diff_zero_when_equal : forall {V : Type} (l r : BraunTree V),
+    size l = size r -> 
+    diff l (size r) = 0.
+Proof.
+  intros V l r Heq.
+  induction l as [| ll _ lr].
+  - rewrite <- Heq. simpl; reflexivity.
+  - destruct r as [| rl Hx rr]; simpl.
+    + simpl in Heq; discriminate Heq.
+    + simpl.
+      destruct (even (size rl)) eqn:Heven.
+      * apply IHl1. reflexivity.  (* Adjust this depending on how diff is recursively structured *)
+      * apply IHl2. reflexivity.  (* Adjust this depending on how diff is recursively structured *)
+Qed.
+
+Lemma okasaki_alg_1_proof : forall (V: Type) (t : BraunTree V),
+  IsBraun t -> sizeOrg t = size t.
+Proof.
+  intros V t.
+  induction t as [| l IHl v' r IHr]; intros Hyp.
+  - simpl. reflexivity.  (* Base case: an empty tree *)
+  - inversion Hyp as [Hempty | l' v'' r' Hl Hr Hbal]; subst.
+    simpl.
+    rewrite IHl by assumption; rewrite IHr by assumption; clear IHl IHr.
+    destruct Hbal as [Hsame | Hdiff]; rewrite Hsame; rewrite Hdiff.
+    + simpl in *.
+      assert (diff l (size r) = 0) by (apply diff_left_right_equal; assumption).
+      rewrite H. simpl. lia.
+    + simpl in *.
+      assert (diff l (size r) = 1) by (apply diff_left_one_more; assumption).
+      rewrite H. simpl. lia.
+Qed.
 
 Lemma okasaki_alg_1_proof : forall (V: Type) (t : BraunTree V),
   IsBraun t -> sizeOrg t = size t.
@@ -1519,8 +1526,48 @@ Proof.
   induction t as [| l IHl v' r IHr].
   - simpl. reflexivity.
   - simpl. rewrite Nat.add_0_r. inversion Hyp. apply IHl in H2.  apply IHr in H3. destruct H4. 
-    + rewrite H2, H3. rewrite H2, H3 in H4. rewrite <- H4. assert ( diff l (size l) = 0). { admit. }
+    + rewrite H2, H3. rewrite H2, H3 in H4. rewrite <- H4. assert ( diff l (size l) = 0). { rewrite <- H2. apply diff_size_tree. inversion Hyp; auto. }
       rewrite H5. lia.
-    + rewrite H2, H3. rewrite H2, H3 in H4. rewrite H4. assert ( diff l (size r) = 1). {admit. }
-      rewrite H5. lia. Admitted.
-  
+    + rewrite H2, H3. rewrite H2, H3 in H4. rewrite H4. assert (size l - 1 = size r). { lia. }
+      assert ( diff l (size r) = 1). { rewrite <- H5. rewrite H5. unfold diff. destruct l as [|ll lv lr]; simpl in *.
+      - rewrite Nat.add_1_r in H4. discriminate H4.
+      - simpl. destruct (even (size r)) eqn:Heven.
+        + apply diff_even_case; assumption. admit. rewrite <- H5. contradiction (size must be non-zero as it equals size r + 1).
+- simpl. destruct (even (size r)) eqn:Heven.
+  + apply diff_even_case; assumption.
+  + apply diff_odd_case; simpl in *; rewrite div2_correct; assumption.
+Qed. }
+      f_equal. lia.
+Admitted.
+*)
+
+Lemma replicate_equals_copyOkasakiComplete :
+  forall (V : Type) (x : V) (n : nat),
+    replicate x n = copyOkasakiComplete x n.
+Proof.
+  intros V x n.
+  induction n as [|n' IH].
+  - simpl. unfold copyOkasakiComplete. unfold copyOkasaki. simpl. reflexivity.
+  - unfold copyOkasakiComplete in *. simpl replicate.
+    unfold copyOkasaki in IH. simpl in IH.
+    destruct (even n') eqn:Heven.
+    + unfold copyOkasaki. simpl. Search Nat.even.
+      rewrite even_S, Heven. simpl.
+      fold copyOkasaki.
+      remember (copyOkasaki x (div2 n')) as st.
+      destruct st as [s t].
+      simpl. rewrite IH. reflexivity.
+    + unfold copyOkasaki. simpl.
+      rewrite even_S, Heven. simpl.
+      fold copyOkasaki.
+      remember (copyOkasaki x (div2 n')) as st.
+      destruct st as [s t].
+      simpl. rewrite IH. reflexivity.
+Qed.
+
+Lemma okasaki_alg_2_proof : forall (V: Type) (v: V) (n: nat),
+  replicate v n = snd(copyOkasaki v n).
+Proof.
+  intros V v n. revert n. induction n as [| n0 Hn0].
+  - simpl. reflexivity.
+  - simpl. rewrite Hn0.
